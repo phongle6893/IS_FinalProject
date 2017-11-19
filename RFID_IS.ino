@@ -26,27 +26,42 @@ MFRC522::MIFARE_Key key;
 
 // Init array that will store new NUID 
 byte nuidPICC[4];
-byte adminKey[4] = {0x90, 0x8A, 0xA9, 0x56};
+byte adminKey[4] = {0x02, 0x0F, 0x0F, 0xA9};
 byte userKeys[4][4]={
-  {0x00, 0x00, 0x00, 0x00},
-  {0x00, 0x00, 0x00, 0x00},
-  {0x00, 0x00, 0x00, 0x00},
+  {0x02, 0x0F, 0x0F, 0xA9},
+  {0x90, 0x8A, 0xA9, 0x56}, //02 0F 0F A9
+  {0x90, 0x8A, 0xA9, 0x56},
   {0x00, 0x00, 0x00, 0x00}
 };
+int roles[4] = {0,2,0,0};
+int option[8][3] = {
+  {1,1,1},
+  {1,1,0},
+  {1,0,1},
+  {1,0,0},
+  {0,1,1},
+  {0,1,0},
+  {0,0,1},
+  {0,0,0}
+};
+int select = -1;
 boolean isLogin     = false;
 boolean isAdminLogin= false;
 boolean isEditMode  = false;
 boolean isScaned    = false;
 boolean isEditing   = false;
-
+int lastRole = 0;
 // Led pins
-int led1 = 8;
+int led[3] = {6,7,8};
 
 void setup() { 
   Serial.begin(9600);
   SPI.begin(); // Init SPI bus
   rfid.PCD_Init(); // Init MFRC522 
-  pinMode(led1, OUTPUT);
+  for (int i = 0; i < sizeof(led); i++){
+    pinMode(led[i], OUTPUT);
+  }
+  
   for (byte i = 0; i < 6; i++) {
     key.keyByte[i] = 0xFF;
   }
@@ -60,21 +75,26 @@ void setup() {
 void loop() {
   
   // Look for new cards
-  
+  if (isEditMode == true && isEditing == false){
+    blinks();
+  }
   if (!rfid.PICC_IsNewCardPresent()) {
       return; 
   }
   if (!rfid.PICC_ReadCardSerial()) {
     return;
   }
+  
   checkRole();
-  delay(2000);
+  prln("-------------");
+  delay(1000);
 }
 
 void checkRole(){
   if (compare(rfid.uid.uidByte, adminKey, rfid.uid.size)){
     // is admin
     prln("is admin");
+    showOptionLed(findRole());
     
     if (isAdminLogin == true){
       
@@ -83,33 +103,97 @@ void checkRole(){
         isEditMode = true;
         prln("switch to edit mode");
       }else{
-        adminLogout();  
+        // End editing
+        if(select >= 0 ){
+          roles[lastRole] = select;
+          Serial.print("select option");
+          Serial.println(select);
+        }
+        
+        prln("End editing");
+        adminLogout();
       }
       
     }else {
-      isAdminLogin = true; 
+      isAdminLogin = true;
     }
   }else{
     // not admin
-    prln("not admin");
+    prln("is user");
+    Serial.println(roles[findRole()]);
+    showOptionLed(roles[findRole()]);
 
     if (isAdminLogin == true){
       if (isEditMode == true) {
+        if (isEditing == true){
+          select = (++select)%8;
+          Serial.print("select: ");Serial.println(select);
+          showOptionLed(select);
+        }
         
         //switch to editing
         isEditing = true;
+        prln("is Editing");
       }else {
         
         //admin logout
         adminLogout();
       }
+    }else {
+      // admin not login before
+    }
+    lastRole = findRole();
+  }
+}
+void showOptionLed(int row){
+  prln("turnOnLed");
+  int lenght = sizeof(option[row]);
+  for (int i = 0; i< lenght; i++){
+    digitalWrite(led[i], LOW);
+    if (option[row][i] == 1){
+      digitalWrite(led[i], HIGH);
     }
   }
+}
+//void turnOnLed(int row){
+//  prln("turnOnLed");
+//  int lenght = sizeof(roles[row]);
+//  for (int i = 0; i< lenght; i++){
+//    digitalWrite(led[i], LOW);
+//    if (roles[row][i] == 1){
+//      digitalWrite(led[i], HIGH);
+//    }
+//  }
+//}
+void turnOffLed(){
+  for (int i = 0;  i< sizeof(led); i++){
+    digitalWrite(led[i], LOW);
+  }
+}
+void blinks(){
+  for (int i = 0;  i< sizeof(led); i++){
+    digitalWrite(led[i], HIGH);
+    delay(100);
+    digitalWrite(led[i], LOW);
+  }
+}
+
+int findRole(){
+  for (int i=0; i< sizeof(userKeys); i++){
+    if (rfid.uid.uidByte[1] == userKeys[i][1]){
+      if (compare(rfid.uid.uidByte,userKeys[i], rfid.uid.size) == true){
+        return i;
+      }
+    }
+  }
+  return -1;
 }
 
 void adminLogout(){
   isAdminLogin  = false;
   isEditMode    = false;
+  isEditing    = false;
+  turnOffLed();
   prln("admin logout");
 }
 
