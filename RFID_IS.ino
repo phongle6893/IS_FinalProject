@@ -29,21 +29,55 @@ byte nuidPICC[4];
 byte adminKey[4] = {0x02, 0x0F, 0x0F, 0xA9};
 byte userKeys[4][4]={
   {0x02, 0x0F, 0x0F, 0xA9},
-  {0x90, 0x8A, 0xA9, 0x56}, //02 0F 0F A9
-  {0x90, 0x8A, 0xA9, 0x56},
-  {0x00, 0x00, 0x00, 0x00}
+  {0x41, 0xDC, 0xB5, 0x79}, //41 DC B5 79
+  {0x10, 0x5D, 0x80, 0xA5}, //10 5D 80 A5
+  {0x90, 0xA8, 0xA9, 0x56}  //90 8A A9 56
 };
-int roles[4] = {0,2,0,0};
-int option[8][3] = {
-  {1,1,1},
-  {1,1,0},
-  {1,0,1},
-  {1,0,0},
-  {0,1,1},
-  {0,1,0},
-  {0,0,1},
-  {0,0,0}
+int roles[4] = {31,20,0,0};
+int option[32][5] = {
+  {0,0,0,0,0},
+  {0,0,0,0,1},
+  {0,0,0,1,0},
+  {0,0,0,1,1},
+  {0,0,1,0,0},
+  {0,0,1,0,1},
+  {0,0,1,1,0},
+  {0,0,1,1,1},
+  {0,1,0,0,0},
+  {0,1,0,0,1},
+  {0,1,0,1,0},
+  {0,1,0,1,1},
+  {0,1,1,0,0},
+  {0,1,1,0,1},
+  {0,1,1,1,0},
+  {0,1,1,1,1},
+  {1,0,0,0,0},
+  {1,0,0,0,1},
+  {1,0,0,1,0},
+  {1,0,0,1,1},
+  {1,0,1,0,0},
+  {1,0,1,0,1},
+  {1,0,1,1,0},
+  {1,0,1,1,1},
+  {1,1,0,0,0},
+  {1,1,0,0,1},
+  {1,1,0,1,0},
+  {1,1,0,1,1},
+  {1,1,1,0,0},
+  {1,1,1,0,1},
+  {1,1,1,1,0},
+  {1,1,1,1,1},
 };
+//int option[8][3] = {
+//  {1,1,1},
+//  {1,1,0},
+//  {1,0,1},
+//  {1,0,0},
+//  {0,1,1},
+//  {0,1,0},
+//  {0,0,1},
+//  {0,0,0}
+//};
 int select = -1;
 boolean isLogin     = false;
 boolean isAdminLogin= false;
@@ -52,7 +86,7 @@ boolean isScaned    = false;
 boolean isEditing   = false;
 int lastRole = 0;
 // Led pins
-int led[3] = {6,7,8};
+int led[5] = {4,5,6,7,8};
 
 void setup() { 
   Serial.begin(9600);
@@ -93,8 +127,8 @@ void loop() {
 void checkRole(){
   if (compare(rfid.uid.uidByte, adminKey, rfid.uid.size)){
     // is admin
-    prln("is admin");
-    showOptionLed(findRole());
+    Serial.println("is admin");
+    showOptionLed(roles[findRole()]);
     
     if (isAdminLogin == true){
       
@@ -121,12 +155,14 @@ void checkRole(){
     // not admin
     prln("is user");
     Serial.println(roles[findRole()]);
+    prln("showoptionled");
     showOptionLed(roles[findRole()]);
+    
 
     if (isAdminLogin == true){
       if (isEditMode == true) {
         if (isEditing == true){
-          select = (++select)%8;
+          select = (++select)%32;
           Serial.print("select: ");Serial.println(select);
           showOptionLed(select);
         }
@@ -146,7 +182,7 @@ void checkRole(){
   }
 }
 void showOptionLed(int row){
-  prln("turnOnLed");
+  Serial.print("turn on led with role: "); Serial.println(row);
   int lenght = sizeof(option[row]);
   for (int i = 0; i< lenght; i++){
     digitalWrite(led[i], LOW);
@@ -171,7 +207,7 @@ void turnOffLed(){
   }
 }
 void blinks(){
-  for (int i = 0;  i< sizeof(led); i++){
+  for (int i = 0;  i< 5; i++){
     digitalWrite(led[i], HIGH);
     delay(100);
     digitalWrite(led[i], LOW);
@@ -179,8 +215,9 @@ void blinks(){
 }
 
 int findRole(){
-  for (int i=0; i< sizeof(userKeys); i++){
-    if (rfid.uid.uidByte[1] == userKeys[i][1]){
+  for (int i=0; i< 4; i++){
+    printHex(rfid.uid.uidByte,4);
+    if (rfid.uid.uidByte[0] == userKeys[i][0]){
       if (compare(rfid.uid.uidByte,userKeys[i], rfid.uid.size) == true){
         return i;
       }
